@@ -39,12 +39,14 @@ class TurnEvent:
 
 
 class TurnDetector:
-    """Causal hysteresis turn detector with steering-commit onset & slight-turn sensitivity."""
+    """Causal hysteresis turn detector with sustained steering-commit onset & visual sync delay."""
 
     def __init__(self, cfg: Dict[str, Any]) -> None:
-        self.smooth_win = int(cfg.get("smoothing_window_frames", 9))
+        self.smooth_win = int(cfg.get("smoothing_window_frames", 11))
         self.enter_thresh = float(cfg.get("enter_yaw_rate_rad_s", 0.065))
-        self.commit_thresh = float(cfg.get("commit_yaw_rate_rad_s", 0.095))
+        self.commit_thresh = float(cfg.get("commit_yaw_rate_rad_s", 0.125))
+        self.min_commit_sustain = int(cfg.get("min_commit_sustain_frames", 15))
+        self.banner_delay_frames = int(cfg.get("banner_delay_frames", 18))
         self.exit_thresh = float(cfg.get("exit_yaw_rate_rad_s", 0.032))
         self.merge_gap_s = float(cfg.get("merge_gap_s", 0.85))
         self.min_dur_s = float(cfg.get("min_duration_s", 0.9))
@@ -146,10 +148,22 @@ class TurnDetector:
             else:
                 maneuver = "Slight Left" if dpsi_c_deg > 0 else "Slight Right"
 
-            # Commit frame: when steering yaw rate genuinely commits (eliminates early banner)
-            active_commit_th = self.commit_thresh if abs_deg >= self.full_turn_deg else self.enter_thresh
-            commit_rel = np.where(np.abs(seg_w) >= active_commit_th)[0]
-            commit_idx = s_idx + int(commit_rel[0]) if len(commit_rel) > 0 else s_idx
+            # Require sustained steering commit + visual sync offset so banner aligns with dashcam turn
+            active_commit_th = (
+                self.commit_thresh if abs_deg >= self.full_turn_deg else max(self.enter_thresh, 0.085)
+            )
+            above_commit = (np.abs(seg_w) >= active_commit_th).astype(int)
+            sustain_win = max(1, min(self.min_commit_sustain, len(seg_w)))
+            sustained_hits = np.convolve(above_commit, np.ones(sustain_win, dtype=int), mode="valid")
+            sustained_rel = np.where(sustained_hits >= sustain_win)[0]
+
+            if len(sustained_rel) > 0:
+                base_commit_idx = s_idx + int(sustained_rel[0]) + (sustain_win // 2)
+            else:
+                fallback_rel = np.where(above_commit > 0)[0]
+                base_commit_idx = s_idx + int(fallback_rel[0]) if len(fallback_rel) > 0 else s_idx
+
+            commit_idx = min(e_idx, base_commit_idx + self.banner_delay_frames)
 
             ev = TurnEvent(
                 turn_id=len(events) + 1,

@@ -7,10 +7,13 @@ import pandas as pd
 @dataclass(frozen=True)
 class StopEvent:
     stop_id: int
-    stop_type: str
+    stop_type: str       # Always "Stop" (counted uniformly for all stop & slow-moving events)
+    display_state: str   # "Stop" (v <= 0.12 m/s) or "Slow Moving" (0.12 < v <= 0.50 m/s)
     start_frame: int
+    banner_start_frame: int
     end_frame: int
     start_t_video_s: float
+    banner_start_t_video_s: float
     end_t_video_s: float
     start_t_sync_s: float
     end_t_sync_s: float
@@ -27,14 +30,23 @@ class StopEvent:
 
 
 class StopDetector:
-    """Detects both brief halts (1-3s) and full stops (>=3s), including roadside pull-overs."""
+    """
+    Detects stationary and very slow-moving (creeping traffic) intervals.
+    All detected intervals are counted under 'Stop', while very slow-moving
+    states are tagged with display_state='Slow Moving' (no 'Brief Halt' state).
+    """
 
     def __init__(self, cfg: Dict[str, Any]) -> None:
-        self.smooth_win = int(cfg.get("smoothing_window_frames", 7))
-        self.speed_thresh = float(cfg.get("speed_thresh_m_s", 0.40))
+        self.smooth_win = int(cfg.get("smoothing_window_frames", 11))
+        self.dead_stop_thresh = float(cfg.get("dead_stop_speed_m_s", 0.12))
+        # Backwards-compatible fallback if old key 'speed_thresh_m_s' is present
+        self.slow_move_thresh = float(
+            cfg.get("slow_move_speed_m_s", cfg.get("speed_thresh_m_s", 0.50))
+        )
         self.max_yaw_rate = float(cfg.get("max_yaw_rate_rad_s", 0.10))
         self.merge_gap_s = float(cfg.get("merge_gap_s", 1.0))
-        self.min_dur_s = float(cfg.get("min_duration_s", 1.0))
+        self.min_dur_s = float(cfg.get("min_duration_s", 1.2))
+        self.banner_delay_frames = int(cfg.get("banner_delay_frames", 24))
 
     def detect(
         self,
@@ -56,7 +68,7 @@ class StopDetector:
         else:
             px_a, py_a = px_c, py_c
 
-        # Causal rolling average (center=False) so short 1-2s stops & pull-overs aren't clipped
+        # Causal rolling average (center=False)
         v_smooth = (
             pd.Series(v_c)
             .rolling(window=self.smooth_win, min_periods=1, center=False)
@@ -70,12 +82,13 @@ class StopDetector:
             .to_numpy()
         )
 
-        is_stopped = (v_smooth <= self.speed_thresh) & (w_smooth <= self.max_yaw_rate)
+        # Unified detection mask covering both dead-stops and creeping/slow-moving traffic
+        is_stopped_or_slow = (v_smooth <= self.slow_move_thresh) & (w_smooth <= self.max_yaw_rate)
 
         raw_segments: List[List[int]] = []
         in_stop = False
         s_idx = 0
-        for i, flag in enumerate(is_stopped):
+        for i, flag in enumerate(is_stopped_or_slow):
             if flag and not in_stop:
                 in_stop = True
                 s_idx = i
@@ -107,14 +120,23 @@ class StopDetector:
             x_a_med = float(np.median(px_a[s_i : e_i + 1]))
             y_a_med = float(np.median(py_a[s_i : e_i + 1]))
             diff_m = float(np.hypot(x_a_med - x_c_med, y_a_med - y_c_med))
-            stype = "Full Stop (>=3s)" if dur_s >= 3.0 else "Brief Halt (1-3s)"
+            mean_spd = float(np.mean(v_c[s_i : e_i + 1]))
+
+            # Count every event as "Stop", but distinguish UI display label for slow-moving crawl
+            display_state = "Stop" if mean_spd <= self.dead_stop_thresh else "Slow Moving"
+
+            # Apply banner confirmation delay so the alert appears after visible deceleration
+            b_idx = min(e_i, s_i + self.banner_delay_frames)
 
             ev = StopEvent(
                 stop_id=len(events) + 1,
-                stop_type=stype,
+                stop_type="Stop",
+                display_state=display_state,
                 start_frame=int(frames[s_i]),
+                banner_start_frame=int(frames[b_idx]),
                 end_frame=int(frames[e_i]),
                 start_t_video_s=round(float(t_vid[s_i]), 2),
+                banner_start_t_video_s=round(float(t_vid[b_idx]), 2),
                 end_t_video_s=round(float(t_vid[e_i]), 2),
                 start_t_sync_s=round(float(t_sync[s_i]), 2),
                 end_t_sync_s=round(float(t_sync[e_i]), 2),
@@ -124,7 +146,7 @@ class StopDetector:
                 px_track_a_m=round(x_a_med, 2),
                 py_track_a_m=round(y_a_med, 2),
                 pos_diff_a_vs_c_m=round(diff_m, 2),
-                mean_speed_fused_m_s=round(float(np.mean(v_c[s_i : e_i + 1])), 3),
+                mean_speed_fused_m_s=round(mean_spd, 3),
             )
             events.append(ev.to_dict())
 

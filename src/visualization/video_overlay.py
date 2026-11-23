@@ -8,7 +8,7 @@ import pandas as pd
 class TrajectoryVideoOverlay:
     """
     Renders full-length side-by-side comparison videos:
-      - Left Panel  (800x720): Synchronized dashcam footage with live telemetry & Turn/Stop alerts
+      - Left Panel  (800x720): Synchronized dashcam footage with live telemetry & Turn/Stop/Slow-Moving alerts
       - Right Panel (800x720): Live 2D ENU Trajectory Plot with Turn/Stop markers & heading vector
     """
 
@@ -119,7 +119,7 @@ class TrajectoryVideoOverlay:
                 if rx <= u_i <= rx + rw and ry <= v_i <= ry + rh:
                     cv2.circle(canvas, (int(u_i), int(v_i)), 2, (100, 116, 139), -1)
 
-        # Plot Stop markers (red squares)
+        # Plot Stop markers (red squares — all stop & slow-moving events counted under Stop)
         if not stops_df.empty:
             sx_col = "px_track_a_m" if use_track_a_coords else "px_fused_m"
             sy_col = "py_track_a_m" if use_track_a_coords else "py_fused_m"
@@ -248,7 +248,7 @@ class TrajectoryVideoOverlay:
             use_track_a_coords=use_track_a,
         )
 
-        # Precompute trajectory pixel arrays for O(1) incremental drawing across all 60,630 frames
+        # Precompute trajectory pixel arrays for O(1) incremental drawing
         if use_track_a:
             px_arr = ta_df["px_m"].ffill().bfill().to_numpy(dtype=float)
             py_arr = ta_df["py_m"].ffill().bfill().to_numpy(dtype=float)
@@ -268,7 +268,7 @@ class TrajectoryVideoOverlay:
         t_sync_arr = tc_df["t_sync_s"].to_numpy(dtype=float)
         u_arr, v_arr = self._world_to_canvas(px_arr, py_arr, bounds, plot_rect)
 
-        # Lookup arrays for fast O(1) active Turn / Stop banner lookup per frame
+        # Lookup arrays for fast O(1) active Turn / Stop / Slow-Moving banner lookup per frame
         turn_lookup = {}
         if not turns_df.empty:
             for row in turns_df.itertuples(index=False):
@@ -280,10 +280,16 @@ class TrajectoryVideoOverlay:
         stop_lookup = {}
         if not stops_df.empty:
             for row in stops_df.itertuples(index=False):
-                tag = "BRIEF HALT" if row.duration_s < 3.0 else "STOP"
-                label = f"{tag} #{row.stop_id}: ({row.duration_s:.1f}s) @ ({row.px_fused_m:.0f}m, {row.py_fused_m:.0f}m)"
-                for fi in range(int(row.start_frame), min(int(row.end_frame) + 1, total_frames)):
-                    stop_lookup[fi] = label
+                # Counted as Stop (S#), displayed as "STOP" or "SLOW MOVING" (never "BRIEF HALT")
+                disp_state = str(getattr(row, "display_state", "Stop")).upper()
+                is_slow_moving = disp_state == "SLOW MOVING"
+                label = (
+                    f"{disp_state} (S#{row.stop_id}): ({row.duration_s:.1f}s) "
+                    f"@ ({row.px_fused_m:.0f}m, {row.py_fused_m:.0f}m)"
+                )
+                onset_frame = int(getattr(row, "banner_start_frame", row.start_frame))
+                for fi in range(onset_frame, min(int(row.end_frame) + 1, total_frames)):
+                    stop_lookup[fi] = (label, is_slow_moving)
 
         # Draw historical trail if start_frame > 0
         for fi in range(1, start_frame + 1):
@@ -341,16 +347,18 @@ class TrajectoryVideoOverlay:
                 2,
             )
 
-            # Active Turn or Stop Banner on Left Video
+            # Active Turn, Slow Moving, or Stop Banner on Left Video
             if f_idx in turn_lookup:
                 t_text, is_uturn = turn_lookup[f_idx]
                 b_col = (147, 51, 234) if is_uturn else (217, 119, 6)
                 cv2.rectangle(left_panel, (16, 16), (panel_w - 16, 62), b_col, -1)
                 cv2.putText(left_panel, t_text, (28, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
             elif f_idx in stop_lookup:
-                s_text = stop_lookup[f_idx]
-                cv2.rectangle(left_panel, (16, 16), (panel_w - 16, 62), (185, 28, 28), -1)
-                cv2.putText(left_panel, s_text, (28, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (255, 255, 255), 2)
+                s_text, is_slow_moving = stop_lookup[f_idx]
+                # Steel-teal banner for Slow Moving; Crimson-red banner for full Stop
+                b_col = (180, 119, 14) if is_slow_moving else (28, 28, 185)
+                cv2.rectangle(left_panel, (16, 16), (panel_w - 16, 62), b_col, -1)
+                cv2.putText(left_panel, s_text, (28, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.54, (255, 255, 255), 2)
 
             # Right Panel: Live 2D Trajectory Map + Current Vehicle Pose Marker
             right_panel = trail_canvas.copy()

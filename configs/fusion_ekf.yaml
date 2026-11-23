@@ -4,29 +4,32 @@ fusion_ekf:
     vel_std_m_s: 1.5
     heading_std_rad: 0.35
     acc_bias_std_m_s2: 0.35
-    gyro_bias_std_rad_s: 0.02
+    gyro_bias_std_rad_s: 0.005          # Tightened: gyro bias is already pre-calibrated from stationary ZUPT
 
   process_noise:
     pos_noise_std_m_s: 0.85
     accel_noise_std_m_s2: 0.90
     gyro_noise_std_rad_s: 0.045
     acc_bias_walk_std: 0.04
-    gyro_bias_walk_std: 0.002
+    gyro_bias_walk_std: 0.0002          # Prevents 100s GPS blackout heading curl from bias random walk
     acc_bias_tau_s: 30.0
     max_speed_m_s: 28.0
 
   measurement_noise:
     gps_pos_std_m: 4.5
-    gps_course_std_rad: 0.30
+    gps_course_std_rad: 0.65
     zupt_vel_std_m_s: 0.12
     visual_zupt_vel_std_m_s: 0.10
-    visual_yaw_rate_std_base: 0.14
+    visual_yaw_rate_std_base: 0.35      # Prevents passing trucks/traffic flow from biasing gyro yaw rate
     visual_outage_speed_std_m_s: 1.40
 
   gating:
-    gps_mahalanobis_threshold: 20.0
-    max_consecutive_rejects: 3
-    min_speed_for_gps_heading_m_s: 3.5
+    gps_mahalanobis_threshold: 18.5
+    gps_course_nis_threshold: 4.0
+    max_consecutive_rejects: 3          # 5 ki jagah 3
+    reacquire_max_jump_m: 260.0         # 165.0 ki jagah 260.0 (taaki 214m flyover blackout ke baad re-lock ho)
+    reacquire_pos_std_multiplier: 1.5   # 1.8 ki jagah 1.5
+    min_speed_for_gps_heading_m_s: 6.0
     visual_min_inlier_ratio: 0.90
     visual_yaw_nis_threshold: 6.63
     visual_dead_stop_flow_px: 0.75

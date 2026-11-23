@@ -1,23 +1,27 @@
 evaluation:
   turn_detection:
-    smoothing_window_frames: 9
+    smoothing_window_frames: 11
     enter_yaw_rate_rad_s: 0.065       # Catches gentle slight turns
-    commit_yaw_rate_rad_s: 0.095      # Banner appears only when actual turn steering commits
+    commit_yaw_rate_rad_s: 0.125      # Raised from 0.095 so banner waits for actual steering commit
+    min_commit_sustain_frames: 15     # Must sustain commit threshold for 0.5s before banner triggers
+    banner_delay_frames: 18           # +0.6s visual sync alignment so banner matches dashcam turn
     exit_yaw_rate_rad_s: 0.032
     merge_gap_s: 0.85
     min_duration_s: 0.9
-    min_angle_deg: 13.0               # Lowered from 22.0° to capture slight turns (13°–22°)
+    min_angle_deg: 13.0               # Captures slight turns (13°–22°)
     full_turn_angle_deg: 55.0
     u_turn_angle_deg: 145.0
     min_entry_speed_m_s: 0.8
     min_mean_speed_m_s: 1.2
 
   stop_detection:
-    smoothing_window_frames: 7        # Fast causal response (~0.23s) so 1-2s stops aren't clipped
-    speed_thresh_m_s: 0.40            # Captures creeping pull-overs & ZUPT noise floor
+    smoothing_window_frames: 11       # Smooths speed noise so banner doesn't trigger prematurely
+    dead_stop_speed_m_s: 0.12         # <= 0.43 km/h -> "Stop"
+    slow_move_speed_m_s: 0.50         # 0.43 - 1.80 km/h -> Counted in Stop, displayed as "Slow Moving"
     max_yaw_rate_rad_s: 0.10          # Allows residual steering settle during roadside pull-over
     merge_gap_s: 1.0
-    min_duration_s: 1.0               # Catches 1–2s brief halts + >=3s full stops
+    min_duration_s: 1.2               # Minimum duration to register a Stop / Slow Moving interval
+    banner_delay_frames: 24           # +0.8s confirmation delay so banner appears after visible slowdown
 
   gps_holdout:
     enabled: true
