@@ -1,0 +1,41 @@
+evaluation:
+  turn_detection:
+    smoothing_window_frames: 9
+    enter_yaw_rate_rad_s: 0.065       # Catches gentle slight turns
+    commit_yaw_rate_rad_s: 0.095      # Banner appears only when actual turn steering commits
+    exit_yaw_rate_rad_s: 0.032
+    merge_gap_s: 0.85
+    min_duration_s: 0.9
+    min_angle_deg: 13.0               # Lowered from 22.0° to capture slight turns (13°–22°)
+    full_turn_angle_deg: 55.0
+    u_turn_angle_deg: 145.0
+    min_entry_speed_m_s: 0.8
+    min_mean_speed_m_s: 1.2
+
+  stop_detection:
+    smoothing_window_frames: 7        # Fast causal response (~0.23s) so 1-2s stops aren't clipped
+    speed_thresh_m_s: 0.40            # Captures creeping pull-overs & ZUPT noise floor
+    max_yaw_rate_rad_s: 0.10          # Allows residual steering settle during roadside pull-over
+    merge_gap_s: 1.0
+    min_duration_s: 1.0               # Catches 1–2s brief halts + >=3s full stops
+
+  gps_holdout:
+    enabled: true
+    intervals_s:
+      - [1250.0, 1280.0]
+      - [1300.0, 1330.0]
+      - [1800.0, 1830.0]
+
+  plots:
+    dpi: 300
+    save_figures: true
+
+  video_overlay:
+    enabled: true
+    full_video: true
+    start_time_s: 0.0
+    duration_s: null
+    frame_stride: 1
+    output_fps: 30.0
+    render_track_a: true
+    render_track_c: true

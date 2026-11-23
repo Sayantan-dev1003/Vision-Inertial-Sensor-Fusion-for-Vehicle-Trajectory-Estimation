@@ -1,0 +1,36 @@
+sensor_ekf:
+  initial_uncertainty:
+    pos_std_m: 5.0
+    vel_std_m_s: 1.5
+    heading_std_rad: 0.35
+    acc_bias_std_m_s2: 0.35
+    gyro_bias_std_rad_s: 0.02
+
+  process_noise:
+    pos_noise_std_m_s: 0.85
+    accel_noise_std_m_s2: 0.90
+    gyro_noise_std_rad_s: 0.045
+    acc_bias_walk_std: 0.04
+    gyro_bias_walk_std: 0.002
+    acc_bias_tau_s: 30.0
+    max_speed_m_s: 28.0
+
+  measurement_noise:
+    gps_pos_std_m: 4.5
+    gps_course_std_rad: 0.30
+    zupt_vel_std_m_s: 0.12
+    zupt_yaw_rate_std_rad_s: 0.01
+
+  gating:
+    gps_mahalanobis_threshold: 16.0
+    max_consecutive_rejects: 3
+    min_speed_for_gps_heading_m_s: 3.5
+
+  zupt:
+    enabled: true
+    gyro_thresh_rad_s: 0.022
+    accel_thresh_m_s2: 0.45
+    accel_rolling_std_thresh_m_s2: 0.18
+    min_duration_s: 0.80
+
+  holdout_intervals_s: []

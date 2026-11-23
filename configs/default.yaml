@@ -1,0 +1,21 @@
+project:
+  name: "BTP-Vehicle-Trajectory-Estimation"
+  random_seed: 42
+
+sensors:
+  active_types: ["accr", "gyro", "gps"]
+  ignored_types: ["lin_accr", "mag_field"]
+
+coordinate_frame:
+  type: "ENU"                # East (x), North (y), Up (z) in metres
+  positive_yaw: "CCW_EAST"   # radians in [-pi, pi], 0 = East, +pi/2 = North
+
+preprocessing:
+  stationary_init_seconds: 5.0
+  gyro_stationary_thresh_rad_s: 0.03
+  acc_stationary_thresh_m_s2: 0.35
+  gps_max_speed_m_s: 45.0    # ~162 km/h sanity bound for GPS outlier flagging
+  max_staleness_s:
+    accr: 0.20
+    gyro: 0.35
+    gps: 2.00                # Gaps > 2s (e.g., 55s GPS outage) stay flagged invalid

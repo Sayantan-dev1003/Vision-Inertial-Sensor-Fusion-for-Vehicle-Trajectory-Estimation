@@ -1,0 +1,43 @@
+camera:
+  calibrated: false
+  image_width: 1920
+  image_height: 1080
+
+  intrinsics:
+    fx: 1632.0
+    fy: 1632.0
+    cx: 960.0
+    cy: 540.0
+    dist_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+  extrinsics:
+    camera_height_m: 1.25
+    pitch_deg: 2.0
+    yaw_offset_deg: 0.0
+
+optical_flow:
+  process_scale: 0.5
+  frame_stride: 2
+  roi_top_ratio: 0.35
+  roi_bottom_ratio: 0.88
+  max_corners: 400
+  quality_level: 0.01
+  min_distance_px: 12
+  fb_error_thresh_px: 1.5
+  ransac_prob: 0.999
+  ransac_thresh_px: 1.5
+  min_inliers: 25
+  stationary_flow_px: 1.45
+  scale_mode: "relative_unit"
+
+visual_ekf:
+  initial_uncertainty:
+    pos_std: 1.0
+    vel_std: 0.5
+    heading_std_rad: 0.15
+  process_noise:
+    accel_noise_std: 0.80
+    gyro_noise_std_rad_s: 0.04
+  measurement_noise:
+    vel_std_base: 0.25
+    zupt_vel_std: 0.05

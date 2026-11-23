@@ -1,0 +1,27 @@
+
+# ==========================================
+# Vehicle Trajectory Estimation
+# Core Dependencies
+# ==========================================
+
+# Numerical Computing
+numpy>=1.26,<3
+scipy>=1.11,<2
+
+# Data Processing
+pandas>=2.2,<4
+
+# Computer Vision and Optical Flow
+opencv-python>=4.9,<5
+
+# GPS Coordinate Transformation
+pyproj>=3.6,<4
+
+# Data Visualization
+matplotlib>=3.8,<4
+
+# Configuration Management
+PyYAML>=6.0,<7
+
+# Progress Monitoring
+tqdm>=4.66,<5

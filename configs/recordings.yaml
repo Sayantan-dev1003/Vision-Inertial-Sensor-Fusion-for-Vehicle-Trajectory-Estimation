@@ -1,0 +1,19 @@
+recordings:
+  drive_20:
+    video_path: "data/raw/videos/video20.mp4"
+    sensor_path: "data/raw/sensors/sensordata20.csv"
+    interim_dir: "data/interim/drive_20"
+    processed_dir: "data/processed/drive_20"
+    output_dir: "outputs/drive_20"
+
+    csv_has_header: false
+    timestamp_unit: "ms"
+
+    imu_mounting:
+      forward_axis: [0.0, 0.0, -1.0]
+      up_axis_hint: [1.0, 0.0, 0.0]
+      yaw_sign: 1.0
+
+    # Empirically validated via visual-gyro yaw-rate cross-correlation (r = +0.625 at 8.25s)
+    video_to_sensor_offset_s: 8.25
+    camera_calibrated: false
